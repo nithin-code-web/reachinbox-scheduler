@@ -25,18 +25,22 @@ const emailSearchSelect = {
 
 type EmailSearchDatabase = Pick<PrismaClient, 'email'>;
 type EmailSearchClient = Client;
+type EmailListDatabase = Pick<PrismaClient, 'email'>;
 
-export async function listScheduledEmails() {
-  return prisma.email.findMany({
-    where: { status: EmailStatus.SCHEDULED },
+export async function listScheduledEmails(
+  userId: string,
+  database: EmailListDatabase = prisma,
+) {
+  return database.email.findMany({
+    where: { status: EmailStatus.SCHEDULED, campaign: { userId } },
     orderBy: { scheduledAt: 'asc' },
     select: emailListSelect,
   });
 }
 
-export async function listSentEmails() {
-  return prisma.email.findMany({
-    where: { status: EmailStatus.SENT },
+export async function listSentEmails(userId: string, database: EmailListDatabase = prisma) {
+  return database.email.findMany({
+    where: { status: EmailStatus.SENT, campaign: { userId } },
     orderBy: { sentAt: 'desc' },
     select: emailListSelect,
   });
@@ -68,7 +72,10 @@ export async function searchEmails(
   }
 
   const emails = await database.email.findMany({
-    where: { id: { in: searchResult.ids } },
+    where: {
+      id: { in: searchResult.ids },
+      campaign: { userId: query.userId },
+    },
     select: emailSearchSelect,
   });
   const emailsById = new Map(emails.map((email) => [email.id, email]));

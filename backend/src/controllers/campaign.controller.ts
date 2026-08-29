@@ -26,8 +26,13 @@ export const createCampaignController: RequestHandler = async (request, response
     return;
   }
 
+  if (!request.auth) {
+    next(new AppError('Authentication required', 401));
+    return;
+  }
+
   try {
-    const result = await createCampaign(parsedBody.data);
+    const result = await createCampaign({ ...parsedBody.data, userId: request.auth.id });
     response.status(201).json(result);
   } catch (error) {
     next(error);

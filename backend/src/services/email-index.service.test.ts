@@ -21,6 +21,7 @@ function emailDocument(id = 'email-1'): EmailIndexDocument {
 
   return {
     id,
+    userId: 'user-1',
     campaignId: 'campaign-1',
     senderId: 'sender-1',
     recipient: 'recipient@example.com',
@@ -50,6 +51,7 @@ test('creates the email index with an explicit mapping and indexes by email ID',
       create: async (args: Record<string, unknown>) => {
         createdIndex = args;
       },
+      putMapping: async () => undefined,
     },
     index: async (args: Record<string, unknown>) => {
       indexedDocument = args;
@@ -80,7 +82,11 @@ test('indexes the current PostgreSQL projection and removes missing records', as
   const indexed: string[] = [];
   const deleted: string[] = [];
   const client = {
-    indices: { exists: async () => true, create: async () => undefined },
+    indices: {
+      exists: async () => true,
+      create: async () => undefined,
+      putMapping: async () => undefined,
+    },
     index: async (args: { id: string }) => {
       indexed.push(args.id);
     },
@@ -92,7 +98,9 @@ test('indexes the current PostgreSQL projection and removes missing records', as
   const database = {
     email: {
       findUnique: async ({ where }: { where: { id: string } }) =>
-        where.id === 'email-1' ? emailDocument() : null,
+        where.id === 'email-1'
+          ? { ...emailDocument(), campaign: { userId: 'user-1' } }
+          : null,
     },
   };
 
@@ -115,7 +123,11 @@ test('bounds asynchronous indexing retries when Elasticsearch is unavailable', a
   const { indexEmailWithRetry } = await servicesPromise;
   let attempts = 0;
   const client = {
-    indices: { exists: async () => true, create: async () => undefined },
+    indices: {
+      exists: async () => true,
+      create: async () => undefined,
+      putMapping: async () => undefined,
+    },
     index: async () => {
       attempts += 1;
       throw new Error('Elasticsearch unavailable');
@@ -124,7 +136,12 @@ test('bounds asynchronous indexing retries when Elasticsearch is unavailable', a
     search: async () => ({ hits: { total: 0, hits: [] } }),
   };
   const database = {
-    email: { findUnique: async () => emailDocument() },
+    email: {
+      findUnique: async () => ({
+        ...emailDocument(),
+        campaign: { userId: 'user-1' },
+      }),
+    },
   };
 
   await assert.rejects(
@@ -165,6 +182,7 @@ test('search returns Elasticsearch IDs for PostgreSQL hydration in hit order', a
   const result = await searchEmails(
     {
       q: 'recipient@example.com',
+      userId: 'user-1',
       status: EmailStatus.SCHEDULED,
       page: 1,
       limit: 20,
@@ -188,7 +206,7 @@ test('search reports Elasticsearch outages as a service-unavailable error', asyn
 
   await assert.rejects(
     searchEmails(
-      { page: 1, limit: 20 },
+      { userId: 'user-1', page: 1, limit: 20 },
       undefined,
       client as unknown as Client,
     ),

@@ -10,6 +10,7 @@ export interface CreateCampaignInput {
   body: string;
   recipients: string[];
   senderId: string;
+  userId: string;
   startTime: Date;
   delaySeconds: number;
   hourlyLimit: number;
@@ -30,8 +31,8 @@ export interface CreateCampaignResult {
 
 export async function createCampaign(input: CreateCampaignInput): Promise<CreateCampaignResult> {
   const { campaign, emails } = await prisma.$transaction(async (transaction) => {
-    const sender = await transaction.sender.findUnique({
-      where: { id: input.senderId },
+    const sender = await transaction.sender.findFirst({
+      where: { id: input.senderId, userId: input.userId },
       select: { userId: true },
     });
 
@@ -41,7 +42,7 @@ export async function createCampaign(input: CreateCampaignInput): Promise<Create
 
     const campaign = await transaction.campaign.create({
       data: {
-        userId: sender.userId,
+        userId: input.userId,
         subject: input.subject,
         body: input.body,
         startTime: input.startTime,

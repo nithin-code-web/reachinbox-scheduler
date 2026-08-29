@@ -17,7 +17,7 @@ import { closeEmailWorker } from './workers/email.worker.js';
 export const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: env.CORS_ORIGIN }));
+app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
 app.use(express.json());
 app.use(apiRouter);
 app.use(notFoundHandler);

@@ -13,16 +13,18 @@
     "prisma:validate": "prisma validate",
     "prisma:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "test": "tsx --test src/services/rate-limit.service.test.ts src/services/processing-lease.service.test.ts src/services/email-reschedule.service.test.ts src/services/email-index.service.test.ts"
+    "test": "tsx --test src/services/rate-limit.service.test.ts src/services/processing-lease.service.test.ts src/services/email-reschedule.service.test.ts src/services/email-index.service.test.ts src/services/auth.service.test.ts src/services/session.service.test.ts src/middleware/auth.test.ts src/services/ownership.service.test.ts"
   },
   "dependencies": {
     "@elastic/elasticsearch": "~8.15.3",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "bullmq": "^5.58.0",
+    "cookie": "^2.0.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
+    "google-auth-library": "^11.0.2",
     "helmet": "^8.1.0",
     "ioredis": "^5.7.0",
     "nodemailer": "^7.0.5",

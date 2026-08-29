@@ -14,6 +14,7 @@ export type EmailIndexClient = Client;
 
 export interface EmailIndexDocument {
   id: string;
+  userId: string;
   campaignId: string;
   senderId: string;
   recipient: string;
@@ -28,6 +29,7 @@ export interface EmailIndexDocument {
 }
 
 export interface EmailSearchQuery {
+  userId: string;
   q?: string | undefined;
   status?: EmailStatus | undefined;
   senderId?: string | undefined;
@@ -52,6 +54,7 @@ const emailIndexDefinition = {
     dynamic: false,
     properties: {
       id: { type: 'keyword' },
+      userId: { type: 'keyword' },
       campaignId: { type: 'keyword' },
       senderId: { type: 'keyword' },
       recipient: {
@@ -83,6 +86,9 @@ const emailIndexSelect = {
   errorMessage: true,
   createdAt: true,
   updatedAt: true,
+  campaign: {
+    select: { userId: true },
+  },
 } as const;
 
 function responseValue<T>(response: T | { body: T }): T {
@@ -100,8 +106,13 @@ function isNotFoundError(error: unknown): boolean {
   return response.statusCode === 404 || response.meta?.statusCode === 404;
 }
 
-function toIndexDocument(email: EmailIndexDocument): EmailIndexDocument {
-  return email;
+type EmailIndexRecord = Omit<EmailIndexDocument, 'userId'> & {
+  campaign: { userId: string };
+};
+
+function toIndexDocument(email: EmailIndexRecord): EmailIndexDocument {
+  const { campaign, ...document } = email;
+  return { ...document, userId: campaign.userId };
 }
 
 export async function ensureEmailIndex(
@@ -109,7 +120,13 @@ export async function ensureEmailIndex(
 ): Promise<void> {
   const exists = responseValue(await client.indices.exists({ index: EMAIL_INDEX_NAME }));
 
-  if (exists) return;
+  if (exists) {
+    await client.indices.putMapping({
+      index: EMAIL_INDEX_NAME,
+      properties: { userId: { type: 'keyword' } },
+    });
+    return;
+  }
 
   try {
     await client.indices.create({
@@ -121,7 +138,13 @@ export async function ensureEmailIndex(
     // Multiple backend instances may initialize concurrently. If another
     // instance won the create race, the desired end state is already met.
     const createdByAnotherInstance = await client.indices.exists({ index: EMAIL_INDEX_NAME });
-    if (responseValue(createdByAnotherInstance)) return;
+    if (responseValue(createdByAnotherInstance)) {
+      await client.indices.putMapping({
+        index: EMAIL_INDEX_NAME,
+        properties: { userId: { type: 'keyword' } },
+      });
+      return;
+    }
     throw error;
   }
 }
@@ -133,7 +156,7 @@ export async function indexEmailDocument(
   await client.index({
     index: EMAIL_INDEX_NAME,
     id: email.id,
-    document: toIndexDocument(email),
+    document: email,
     refresh: false,
   });
 }
@@ -164,7 +187,7 @@ export async function indexEmailById(
     return;
   }
 
-  await indexEmailDocument(email, client);
+  await indexEmailDocument(toIndexDocument(email), client);
 }
 
 export async function indexEmailWithRetry(
@@ -218,7 +241,7 @@ export async function reconcileEmailIndex(
   });
 
   for (const email of emails) {
-    await indexEmailDocument(email, client);
+    await indexEmailDocument(toIndexDocument(email), client);
   }
 
   return emails.length;
@@ -228,7 +251,7 @@ export async function searchEmailIndex(
   query: EmailSearchQuery,
   client: EmailIndexClient = elasticsearchClient,
 ): Promise<EmailSearchResult> {
-  const filters = [];
+  const filters: Array<Record<string, unknown>> = [{ term: { userId: query.userId } }];
 
   if (query.status) filters.push({ term: { status: query.status } });
   if (query.senderId) filters.push({ term: { senderId: query.senderId } });

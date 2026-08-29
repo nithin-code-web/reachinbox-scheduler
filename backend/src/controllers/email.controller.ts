@@ -23,23 +23,38 @@ const emailSearchSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
-export const listScheduledEmailsController: RequestHandler = async (_request, response, next) => {
+export const listScheduledEmailsController: RequestHandler = async (request, response, next) => {
+  if (!request.auth) {
+    next(new AppError('Authentication required', 401));
+    return;
+  }
+
   try {
-    response.status(200).json(await listScheduledEmails());
+    response.status(200).json(await listScheduledEmails(request.auth.id));
   } catch (error) {
     next(error);
   }
 };
 
-export const listSentEmailsController: RequestHandler = async (_request, response, next) => {
+export const listSentEmailsController: RequestHandler = async (request, response, next) => {
+  if (!request.auth) {
+    next(new AppError('Authentication required', 401));
+    return;
+  }
+
   try {
-    response.status(200).json(await listSentEmails());
+    response.status(200).json(await listSentEmails(request.auth.id));
   } catch (error) {
     next(error);
   }
 };
 
 export const searchEmailsController: RequestHandler = async (request, response, next) => {
+  if (!request.auth) {
+    next(new AppError('Authentication required', 401));
+    return;
+  }
+
   const parsedQuery = emailSearchSchema.safeParse(request.query);
 
   if (!parsedQuery.success) {
@@ -48,7 +63,7 @@ export const searchEmailsController: RequestHandler = async (request, response, 
   }
 
   try {
-    response.status(200).json(await searchEmails(parsedQuery.data));
+    response.status(200).json(await searchEmails({ ...parsedQuery.data, userId: request.auth.id }));
   } catch (error) {
     next(error);
   }
