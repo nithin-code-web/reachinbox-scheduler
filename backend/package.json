@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@elastic/elasticsearch": "^9.2.0",
@@ -26,6 +27,7 @@
     "nodemailer": "^7.0.5",
     "pg": "^8.16.3",
     "pino": "^9.9.0",
+    "tsx": "^4.20.3",
     "zod": "^4.0.17"
   },
   "devDependencies": {
@@ -35,7 +37,6 @@
     "@types/nodemailer": "^7.0.1",
     "@types/pg": "^8.15.5",
     "prisma": "^7.10.0",
-    "tsx": "^4.20.3",
     "typescript": "^5.9.2"
   }
 }

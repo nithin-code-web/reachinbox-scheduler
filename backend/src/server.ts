@@ -9,6 +9,7 @@ import { closePrisma } from './db/prisma.js';
 import { closeRedis } from './db/redis.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { notFoundHandler } from './middleware/not-found.js';
+import { closeEmailQueue } from './queues/email.queue.js';
 import { apiRouter } from './routes/index.js';
 
 export const app = express();
@@ -35,6 +36,7 @@ async function gracefulShutdown(signal: string): Promise<void> {
     if (serverError) logger.error({ err: serverError }, 'Error closing HTTP server');
 
     try {
+      await closeEmailQueue();
       await Promise.all([closePostgres(), closePrisma(), closeRedis(), closeElasticsearch()]);
       logger.info('Graceful shutdown completed');
       process.exit(serverError ? 1 : 0);
