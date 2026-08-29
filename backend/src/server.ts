@@ -11,6 +11,7 @@ import { errorHandler } from './middleware/error-handler.js';
 import { notFoundHandler } from './middleware/not-found.js';
 import { closeEmailQueue } from './queues/email.queue.js';
 import { apiRouter } from './routes/index.js';
+import { closeEmailIndexing, startEmailIndexing } from './services/email-index.service.js';
 import { closeEmailWorker } from './workers/email.worker.js';
 
 export const app = express();
@@ -26,6 +27,8 @@ const server = app.listen(env.PORT, () => {
   logger.info({ port: env.PORT, environment: env.NODE_ENV }, 'Backend server started');
 });
 
+startEmailIndexing();
+
 let isShuttingDown = false;
 
 async function gracefulShutdown(signal: string): Promise<void> {
@@ -39,6 +42,7 @@ async function gracefulShutdown(signal: string): Promise<void> {
     try {
       await closeEmailWorker();
       await closeEmailQueue();
+      await closeEmailIndexing();
       await Promise.all([closePostgres(), closePrisma(), closeRedis(), closeElasticsearch()]);
       logger.info('Graceful shutdown completed');
       process.exit(serverError ? 1 : 0);

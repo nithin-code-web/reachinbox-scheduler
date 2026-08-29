@@ -27,6 +27,7 @@ import {
   renewProcessingLease,
 } from '../services/processing-lease.service.js';
 import { rescheduleEmailForNextHour } from '../services/email-reschedule.service.js';
+import { queueEmailIndexUpdate } from '../services/email-index.service.js';
 
 const MAX_ERROR_MESSAGE_LENGTH = 500;
 const SEND_START_LOCK_TTL_MS = Math.min(env.PROCESSING_LEASE_MS, 30_000);
@@ -289,6 +290,7 @@ async function processSendEmailJob(job: Job<SendEmailJobData>): Promise<void> {
   let smtpSendSucceeded = false;
 
   logger.info({ emailId, jobId, leaseUntil: lease.leaseUntil }, 'Email transitioned to processing');
+  queueEmailIndexUpdate(emailId);
   lease.startHeartbeat();
 
   try {
@@ -392,6 +394,7 @@ async function processSendEmailJob(job: Job<SendEmailJobData>): Promise<void> {
 
     await lease.stopHeartbeat();
     await transitionToSent(emailId, lease.leaseUntil);
+    queueEmailIndexUpdate(emailId);
 
     logger.info({ emailId, recipient: email.recipient, jobId }, 'Email sent successfully');
   } catch (error) {
@@ -399,7 +402,10 @@ async function processSendEmailJob(job: Job<SendEmailJobData>): Promise<void> {
     sendStartSlot = undefined;
     await lease.stopHeartbeat();
 
-    if (error instanceof DelayedError) throw error;
+    if (error instanceof DelayedError) {
+      queueEmailIndexUpdate(emailId);
+      throw error;
+    }
 
     // SMTP success followed by a process crash or database failure remains an
     // inherently ambiguous delivery window; email cannot be exactly once.
@@ -434,6 +440,7 @@ async function processSendEmailJob(job: Job<SendEmailJobData>): Promise<void> {
       }
 
       await restoreScheduledStatus(emailId, lease.leaseUntil, errorMessage);
+      queueEmailIndexUpdate(emailId);
       logger.error(
         { err: error, emailId, jobId },
         'Pre-SMTP throttling failure; email returned to scheduled state',
@@ -448,6 +455,7 @@ async function processSendEmailJob(job: Job<SendEmailJobData>): Promise<void> {
       retryable ? EmailStatus.SCHEDULED : EmailStatus.FAILED,
       errorMessage,
     );
+    queueEmailIndexUpdate(emailId);
 
     logger.error(
       {

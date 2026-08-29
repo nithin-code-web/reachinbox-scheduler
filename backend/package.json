@@ -13,10 +13,10 @@
     "prisma:validate": "prisma validate",
     "prisma:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "test": "tsx --test src/services/rate-limit.service.test.ts src/services/processing-lease.service.test.ts src/services/email-reschedule.service.test.ts"
+    "test": "tsx --test src/services/rate-limit.service.test.ts src/services/processing-lease.service.test.ts src/services/email-reschedule.service.test.ts src/services/email-index.service.test.ts"
   },
   "dependencies": {
-    "@elastic/elasticsearch": "^9.2.0",
+    "@elastic/elasticsearch": "~8.15.3",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "bullmq": "^5.58.0",

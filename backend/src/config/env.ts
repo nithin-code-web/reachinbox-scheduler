@@ -14,6 +14,7 @@ const envSchema = z.object({
   ELASTICSEARCH_NODE: z.string().url().optional(),
   ELASTICSEARCH_USERNAME: z.string().optional(),
   ELASTICSEARCH_PASSWORD: z.string().optional(),
+  ELASTICSEARCH_RECONCILIATION_INTERVAL_MS: z.coerce.number().int().min(10_000).default(60_000),
   ETHEREAL_HOST: z.string().min(1).default('smtp.ethereal.email'),
   ETHEREAL_PORT: z.coerce.number().int().positive().default(587),
   ETHEREAL_USER: z.string().min(1),

@@ -2,6 +2,7 @@ import { EmailStatus } from '@prisma/client';
 import { logger } from '../config/logger.js';
 import { prisma } from '../db/prisma.js';
 import { addSendEmailJob } from '../queues/email.queue.js';
+import { queueEmailIndexUpdate } from './email-index.service.js';
 import { AppError } from '../utils/app-error.js';
 
 export interface CreateCampaignInput {
@@ -138,8 +139,12 @@ export async function createCampaign(input: CreateCampaignInput): Promise<Create
       'Campaign created but email scheduling jobs could not be fully created',
     );
 
+    for (const email of emails) queueEmailIndexUpdate(email.id);
+
     throw new AppError('Campaign created, but email scheduling failed', 503);
   }
+
+  for (const email of emails) queueEmailIndexUpdate(email.id);
 
   logger.info(
     { campaignId: campaign.id, scheduledCount: emails.length },
