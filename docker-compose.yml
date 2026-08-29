@@ -1,4 +1,30 @@
 services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-reachinbox}:${POSTGRES_PASSWORD:-reachinbox_dev_password}@postgres:5432/${POSTGRES_DB:-reachinbox}
+      REDIS_URL: redis://redis:6379
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      ETHEREAL_HOST: ${ETHEREAL_HOST:-smtp.ethereal.email}
+      ETHEREAL_PORT: ${ETHEREAL_PORT:-587}
+      ETHEREAL_USER: ${ETHEREAL_USER:-local-dev-user}
+      ETHEREAL_PASSWORD: ${ETHEREAL_PASSWORD:-local-dev-password}
+      ETHEREAL_SECURE: ${ETHEREAL_SECURE:-false}
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+
   postgres:
     image: postgres:16-alpine
     environment:
