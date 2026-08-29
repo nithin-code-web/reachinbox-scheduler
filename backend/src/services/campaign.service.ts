@@ -2,6 +2,7 @@ import { EmailStatus } from '@prisma/client';
 import { logger } from '../config/logger.js';
 import { prisma } from '../db/prisma.js';
 import { addSendEmailJob } from '../queues/email.queue.js';
+import { enqueueSlackNotification } from '../queues/slack.queue.js';
 import { queueEmailIndexUpdate } from './email-index.service.js';
 import { AppError } from '../utils/app-error.js';
 
@@ -141,11 +142,24 @@ export async function createCampaign(input: CreateCampaignInput): Promise<Create
     );
 
     for (const email of emails) queueEmailIndexUpdate(email.id);
+    void enqueueSlackNotification({
+      eventId: `campaign-scheduling-failed:${campaign.id}`,
+      event: 'campaign_scheduling_failed',
+      userId: input.userId,
+      campaignId: campaign.id,
+    });
 
     throw new AppError('Campaign created, but email scheduling failed', 503);
   }
 
   for (const email of emails) queueEmailIndexUpdate(email.id);
+  void enqueueSlackNotification({
+    eventId: `campaign-scheduled:${campaign.id}`,
+    event: 'campaign_scheduled',
+    userId: input.userId,
+    campaignId: campaign.id,
+    scheduledCount: emails.length,
+  });
 
   logger.info(
     { campaignId: campaign.id, scheduledCount: emails.length },

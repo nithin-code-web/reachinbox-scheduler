@@ -10,9 +10,11 @@ import { closeRedis } from './db/redis.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { notFoundHandler } from './middleware/not-found.js';
 import { closeEmailQueue } from './queues/email.queue.js';
+import { closeSlackNotificationQueue } from './queues/slack.queue.js';
 import { apiRouter } from './routes/index.js';
 import { closeEmailIndexing, startEmailIndexing } from './services/email-index.service.js';
 import { closeEmailWorker } from './workers/email.worker.js';
+import { closeSlackNotificationWorker } from './workers/slack.worker.js';
 
 export const app = express();
 
@@ -42,6 +44,8 @@ async function gracefulShutdown(signal: string): Promise<void> {
     try {
       await closeEmailWorker();
       await closeEmailQueue();
+      await closeSlackNotificationWorker();
+      await closeSlackNotificationQueue();
       await closeEmailIndexing();
       await Promise.all([closePostgres(), closePrisma(), closeRedis(), closeElasticsearch()]);
       logger.info('Graceful shutdown completed');

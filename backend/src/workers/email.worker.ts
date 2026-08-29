@@ -28,6 +28,7 @@ import {
 } from '../services/processing-lease.service.js';
 import { rescheduleEmailForNextHour } from '../services/email-reschedule.service.js';
 import { queueEmailIndexUpdate } from '../services/email-index.service.js';
+import { enqueueSlackNotification } from '../queues/slack.queue.js';
 
 const MAX_ERROR_MESSAGE_LENGTH = 500;
 const SEND_START_LOCK_TTL_MS = Math.min(env.PROCESSING_LEASE_MS, 30_000);
@@ -395,6 +396,14 @@ async function processSendEmailJob(job: Job<SendEmailJobData>): Promise<void> {
     await lease.stopHeartbeat();
     await transitionToSent(emailId, lease.leaseUntil);
     queueEmailIndexUpdate(emailId);
+    void enqueueSlackNotification({
+      eventId: `email-sent:${emailId}`,
+      event: 'email_sent',
+      userId: email.campaign.userId,
+      campaignId: email.campaignId,
+      emailId,
+      recipient: email.recipient,
+    });
 
     logger.info({ emailId, recipient: email.recipient, jobId }, 'Email sent successfully');
   } catch (error) {
@@ -456,6 +465,17 @@ async function processSendEmailJob(job: Job<SendEmailJobData>): Promise<void> {
       errorMessage,
     );
     queueEmailIndexUpdate(emailId);
+    if (!retryable) {
+      void enqueueSlackNotification({
+        eventId: `email-failed:${emailId}`,
+        event: 'email_failed',
+        userId: email.campaign.userId,
+        campaignId: email.campaignId,
+        emailId,
+        recipient: email.recipient,
+        errorMessage,
+      });
+    }
 
     logger.error(
       {

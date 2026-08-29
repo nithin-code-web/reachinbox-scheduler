@@ -11,6 +11,11 @@ const optionalUrl = z.preprocess(
   z.string().url().optional(),
 );
 
+const optionalSlackEncryptionKey = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z.string().regex(/^[0-9a-fA-F]{64}$/).optional(),
+);
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
@@ -28,6 +33,13 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: optionalNonEmptyString,
   GOOGLE_CLIENT_SECRET: optionalNonEmptyString,
   GOOGLE_REDIRECT_URI: optionalUrl,
+  SLACK_CLIENT_ID: optionalNonEmptyString,
+  SLACK_CLIENT_SECRET: optionalNonEmptyString,
+  SLACK_REDIRECT_URI: optionalUrl,
+  SLACK_TOKEN_ENCRYPTION_KEY: optionalSlackEncryptionKey,
+  SLACK_API_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+  SLACK_NOTIFICATION_CONCURRENCY: z.coerce.number().int().positive().default(2),
+  SLACK_NOTIFICATION_ATTEMPTS: z.coerce.number().int().positive().default(3),
   FRONTEND_URL: z.string().url().default('http://localhost:5173'),
   SESSION_COOKIE_NAME: z.string().min(1).default('reachinbox_session'),
   SESSION_TTL_SECONDS: z.coerce.number().int().positive().default(604_800),
@@ -61,6 +73,24 @@ const envSchema = z.object({
     {
       message: 'GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI must be configured together',
       path: ['GOOGLE_CLIENT_ID'],
+    },
+  )
+  .refine(
+    (values) => {
+      const slackConfiguration = [
+        values.SLACK_CLIENT_ID,
+        values.SLACK_CLIENT_SECRET,
+        values.SLACK_REDIRECT_URI,
+      ];
+      const configuredTogether =
+        slackConfiguration.every(Boolean) || slackConfiguration.every((value) => !value);
+      return configuredTogether &&
+        (!slackConfiguration.some(Boolean) || Boolean(values.SLACK_TOKEN_ENCRYPTION_KEY));
+    },
+    {
+      message:
+        'Slack OAuth credentials must be configured together with a 32-byte hex token encryption key',
+      path: ['SLACK_CLIENT_ID'],
     },
   );
 
