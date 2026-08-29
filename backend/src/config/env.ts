@@ -7,6 +7,7 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().min(1).default('http://localhost:5173'),
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
+  WORKER_CONCURRENCY: z.coerce.number().int().positive().default(5),
   ELASTICSEARCH_URL: z.string().url().optional(),
   ELASTICSEARCH_NODE: z.string().url().optional(),
   ELASTICSEARCH_USERNAME: z.string().optional(),

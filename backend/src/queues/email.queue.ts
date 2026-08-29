@@ -13,6 +13,14 @@ export interface SendEmailJobData {
 
 export const emailQueue = new Queue<SendEmailJobData>(EMAIL_QUEUE_NAME, {
   connection: redisConnection,
+  defaultJobOptions: {
+    // Bounded exponential retries for transient SMTP/network failures.
+    attempts: 3,
+    backoff: {
+      type: 'exponential',
+      delay: 5000,
+    },
+  },
 });
 
 export function emailJobId(emailId: string): string {
