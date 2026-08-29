@@ -12,7 +12,8 @@
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
     "prisma:migrate": "prisma migrate dev",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "test": "tsx --test src/services/rate-limit.service.test.ts src/services/processing-lease.service.test.ts src/services/email-reschedule.service.test.ts"
   },
   "dependencies": {
     "@elastic/elasticsearch": "^9.2.0",

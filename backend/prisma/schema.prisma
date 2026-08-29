@@ -65,6 +65,7 @@ model Email {
   scheduledAt    DateTime    @db.Timestamptz(6)
   sentAt         DateTime?   @db.Timestamptz(6)
   status         EmailStatus @default(SCHEDULED)
+  processingLeaseUntil DateTime? @db.Timestamptz(6)
   bullmqJobId    String?     @unique
   idempotencyKey String      @unique
   errorMessage   String?

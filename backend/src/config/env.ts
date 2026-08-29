@@ -8,6 +8,8 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
   WORKER_CONCURRENCY: z.coerce.number().int().positive().default(5),
+  EMAIL_SEND_DELAY_MS: z.coerce.number().int().min(0).default(2000),
+  PROCESSING_LEASE_MS: z.coerce.number().int().min(10_000).default(300000),
   ELASTICSEARCH_URL: z.string().url().optional(),
   ELASTICSEARCH_NODE: z.string().url().optional(),
   ELASTICSEARCH_USERNAME: z.string().optional(),
