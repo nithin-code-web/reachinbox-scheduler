@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum EmailStatus {
+  SCHEDULED
+  PROCESSING
+  SENT
+  FAILED
+}
+
+model User {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  googleId       String?         @unique
+  email          String          @unique
+  name           String
+  avatarUrl      String?
+  senders        Sender[]
+  campaigns      Campaign[]
+  slackConnection SlackConnection?
+  createdAt      DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime        @updatedAt @db.Timestamptz(6)
+}
+
+model Sender {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @db.Uuid
+  email       String
+  displayName String?
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emails      Email[]
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([userId])
+}
+
+model Campaign {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String   @db.Uuid
+  subject      String
+  body         String
+  startTime    DateTime @db.Timestamptz(6)
+  delaySeconds Int
+  hourlyLimit  Int
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emails       Email[]
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([userId])
+}
+
+model Email {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaignId     String      @db.Uuid
+  senderId       String      @db.Uuid
+  recipient      String
+  subject        String
+  body           String
+  scheduledAt    DateTime    @db.Timestamptz(6)
+  sentAt         DateTime?   @db.Timestamptz(6)
+  status         EmailStatus @default(SCHEDULED)
+  bullmqJobId    String?     @unique
+  idempotencyKey String      @unique
+  errorMessage   String?
+  campaign       Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sender         Sender      @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  createdAt      DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime    @updatedAt @db.Timestamptz(6)
+
+  @@index([campaignId])
+  @@index([senderId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([recipient])
+  @@index([createdAt])
+  @@index([senderId, scheduledAt])
+}
+
+model SlackConnection {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @unique @db.Uuid
+  accessToken String
+  teamId      String
+  channelId   String?
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+}

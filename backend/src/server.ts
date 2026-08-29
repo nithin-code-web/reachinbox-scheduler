@@ -5,6 +5,7 @@ import { env } from './config/env.js';
 import { logger } from './config/logger.js';
 import { closeElasticsearch } from './db/elasticsearch.js';
 import { closePostgres } from './db/postgres.js';
+import { closePrisma } from './db/prisma.js';
 import { closeRedis } from './db/redis.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { notFoundHandler } from './middleware/not-found.js';
@@ -34,7 +35,7 @@ async function gracefulShutdown(signal: string): Promise<void> {
     if (serverError) logger.error({ err: serverError }, 'Error closing HTTP server');
 
     try {
-      await Promise.all([closePostgres(), closeRedis(), closeElasticsearch()]);
+      await Promise.all([closePostgres(), closePrisma(), closeRedis(), closeElasticsearch()]);
       logger.info('Graceful shutdown completed');
       process.exit(serverError ? 1 : 0);
     } catch (error) {

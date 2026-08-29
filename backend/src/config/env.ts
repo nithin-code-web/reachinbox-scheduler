@@ -7,7 +7,8 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().min(1).default('http://localhost:5173'),
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
-  ELASTICSEARCH_NODE: z.string().url(),
+  ELASTICSEARCH_URL: z.string().url().optional(),
+  ELASTICSEARCH_NODE: z.string().url().optional(),
   ELASTICSEARCH_USERNAME: z.string().optional(),
   ELASTICSEARCH_PASSWORD: z.string().optional(),
   ETHEREAL_HOST: z.string().min(1).default('smtp.ethereal.email'),
@@ -18,6 +19,14 @@ const envSchema = z.object({
     .string()
     .default('false')
     .transform((value) => value.toLowerCase() === 'true'),
+}).refine((values) => values.ELASTICSEARCH_URL || values.ELASTICSEARCH_NODE, {
+  message: 'ELASTICSEARCH_URL or ELASTICSEARCH_NODE is required',
+  path: ['ELASTICSEARCH_URL'],
 });
 
-export const env = envSchema.parse(process.env);
+const parsedEnv = envSchema.parse(process.env);
+
+export const env = {
+  ...parsedEnv,
+  ELASTICSEARCH_NODE: parsedEnv.ELASTICSEARCH_URL ?? parsedEnv.ELASTICSEARCH_NODE!,
+};
