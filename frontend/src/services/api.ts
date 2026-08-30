@@ -1,5 +1,15 @@
 import { mockScheduledEmails, mockSenders, mockSentEmails, mockUser } from '../data/mock';
-import type { CampaignDraft, EmailPagination, EmailRecord, EmailSearchResponse, Sender, User } from '../types';
+import type {
+  CampaignDraft,
+  EmailPagination,
+  EmailRecord,
+  EmailSearchResponse,
+  Sender,
+  SlackChannel,
+  SlackChannelsResponse,
+  SlackConnection,
+  User,
+} from '../types';
 
 const runtimeEnv = import.meta.env ?? {};
 const apiBaseUrl = (runtimeEnv.VITE_API_BASE_URL ?? 'http://localhost:3000').replace(/\/$/, '');
@@ -7,6 +17,7 @@ const useMockData = (runtimeEnv.VITE_USE_MOCK_DATA ?? 'false') === 'true';
 const defaultSenderId = runtimeEnv.VITE_DEFAULT_SENDER_ID?.trim() ?? '';
 
 export const googleLoginUrl = `${apiBaseUrl}/auth/google`;
+export const slackConnectUrl = `${apiBaseUrl}/auth/slack`;
 
 export class ApiError extends Error {
   constructor(public readonly status: number, message: string) {
@@ -95,6 +106,21 @@ export const api = {
   async senders(): Promise<Sender[]> {
     if (useMockData) return mockSenders;
     return defaultSenderId ? [{ id: defaultSenderId, displayName: 'Configured sender', email: 'Configured sender ID' }] : [];
+  },
+  async slackConnection(): Promise<SlackConnection> {
+    return request<SlackConnection>('/api/slack/connection');
+  },
+  async slackChannels(): Promise<SlackChannelsResponse> {
+    return request<SlackChannelsResponse>('/api/slack/channels');
+  },
+  async selectSlackChannel(channelId: string): Promise<SlackConnection> {
+    return request<SlackConnection>('/api/slack/connection/channel', {
+      method: 'PATCH',
+      body: JSON.stringify({ channelId }),
+    });
+  },
+  async disconnectSlack(): Promise<SlackConnection> {
+    return request<SlackConnection>('/api/slack/connection', { method: 'DELETE' });
   },
 };
 

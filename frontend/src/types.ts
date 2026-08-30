@@ -28,6 +28,23 @@ export interface Sender {
   displayName?: string | null;
 }
 
+export interface SlackConnection {
+  connected: boolean;
+  teamId: string | null;
+  channelId: string | null;
+}
+
+export interface SlackChannel {
+  id: string;
+  name: string;
+  isPrivate: boolean;
+}
+
+export interface SlackChannelsResponse {
+  channels: SlackChannel[];
+  nextCursor: string | null;
+}
+
 export interface CampaignDraft {
   subject: string;
   body: string;

@@ -1,4 +1,5 @@
 import { Icon } from './Icon';
+import { SlackConnection } from './SlackConnection';
 import type { Mailbox, User } from '../types';
 
 interface SidebarProps {
@@ -46,6 +47,8 @@ export function Sidebar({ user, view, scheduledCount, sentCount, collapsed, onVi
           {!collapsed && <><span>Sent</span><span className="nav-count">{sentCount}</span></>}
         </button>
       </nav>
+
+      <SlackConnection />
 
       <div className="sidebar-footer">
         <button className="nav-item" type="button"><Icon name="settings" size={18} />{!collapsed && <span>Settings</span>}</button>
