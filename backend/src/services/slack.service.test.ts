@@ -152,13 +152,21 @@ test('returns safe connection data and verifies channel selection through Slack'
   const fetcher = async (input: string | URL, init?: RequestInit) => {
     assert.match(String(input), /conversations\.(list|info)/);
     assert.equal((init?.headers as Record<string, string>).Authorization, 'Bearer xoxb-secret');
+    if (String(input).includes('conversations.info')) {
+      assert.equal(init?.method, 'GET');
+      assert.equal(init?.body, undefined);
+      assert.equal(new URL(String(input)).searchParams.get('channel'), 'C1');
+      return jsonResponse({ ok: true, channel: { id: 'C1', is_archived: false } });
+    }
+
+    assert.equal(init?.method, 'POST');
     return String(input).includes('conversations.list')
       ? jsonResponse({
           ok: true,
           channels: [{ id: 'C1', name: 'alerts', is_private: true }],
           response_metadata: { next_cursor: '' },
         })
-      : jsonResponse({ ok: true, channel: { id: 'C1', is_archived: false } });
+      : jsonResponse({ ok: false, error: 'unexpected_method' });
   };
 
   assert.deepEqual(await getSlackConnection('user-1', database as never), {

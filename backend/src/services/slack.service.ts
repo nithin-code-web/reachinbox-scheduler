@@ -36,6 +36,10 @@ interface SlackApiErrorOptions {
   retryAfterMs?: number | undefined;
 }
 
+interface SlackApiRequestOptions {
+  httpMethod?: 'GET' | 'POST';
+}
+
 export class SlackApiError extends Error {
   public readonly retryable: boolean;
   public readonly code: string;
@@ -96,18 +100,35 @@ async function slackApiRequest(
   token: string,
   body: Record<string, unknown>,
   fetcher: SlackFetch = fetch,
+  options: SlackApiRequestOptions = {},
 ): Promise<Record<string, unknown>> {
+  const httpMethod = options.httpMethod ?? 'POST';
+  const url = new URL(`${SLACK_API_URL}/${method}`);
+  const request: RequestInit = {
+    method: httpMethod,
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    signal: AbortSignal.timeout(env.SLACK_API_TIMEOUT_MS),
+  };
+
+  if (httpMethod === 'GET') {
+    for (const [key, value] of Object.entries(body)) {
+      if (value !== undefined && value !== null) {
+        url.searchParams.set(key, String(value));
+      }
+    }
+  } else {
+    request.headers = {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json; charset=utf-8',
+    };
+    request.body = JSON.stringify(body);
+  }
+
   let response: Response;
   try {
-    response = await fetcher(`${SLACK_API_URL}/${method}`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json; charset=utf-8',
-      },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(env.SLACK_API_TIMEOUT_MS),
-    });
+    response = await fetcher(url.toString(), request);
   } catch {
     throw new SlackApiError('Slack API request failed', {
       retryable: true,
@@ -359,6 +380,7 @@ export async function selectSlackChannel(
     decryptSlackToken(connection.accessToken),
     { channel: channelId },
     fetcher,
+    { httpMethod: 'GET' },
   );
   const channel = isRecord(response.channel) ? response.channel : null;
   if (!channel || channel.id !== channelId || channel.is_archived === true) {
