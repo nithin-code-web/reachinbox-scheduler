@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { UnrecoverableError } from 'bullmq';
+import type { SlackNotificationEvent } from '../types/slack.js';
 
 process.env.DATABASE_URL ??= 'postgresql://test:test@localhost:5432/test';
 process.env.REDIS_URL ??= 'redis://localhost:6379';
@@ -11,7 +12,7 @@ process.env.SLACK_TOKEN_ENCRYPTION_KEY ??= 'a'.repeat(64);
 
 const workerPromise = import('./slack.worker.js');
 
-function job(event: 'email_sent' | 'email_failed' = 'email_sent') {
+function job(event: SlackNotificationEvent = 'email_sent') {
   return {
     id: 'slack-event-1',
     data: {
@@ -22,6 +23,9 @@ function job(event: 'email_sent' | 'email_failed' = 'email_sent') {
       emailId: 'email-1',
       recipient: 'recipient@example.com',
       ...(event === 'email_failed' ? { errorMessage: 'SMTP rejected message' } : {}),
+      ...(event === 'email_rate_limited'
+        ? { senderId: 'sender-1', nextHourAt: '2026-08-30T12:00:00.000Z' }
+        : {}),
     },
   };
 }
@@ -34,6 +38,19 @@ test('processes a notification without putting Slack in the email worker path', 
     return true;
   });
   assert.match(message, /Email email-1 sent to recipient@example.com/);
+});
+
+test('renders a concise hourly-limit notification', async () => {
+  const { processSlackNotificationJob } = await workerPromise;
+  let message = '';
+  await processSlackNotificationJob(job('email_rate_limited') as never, async (_userId, text) => {
+    message = text;
+    return true;
+  });
+  assert.equal(
+    message,
+    'Hourly email limit reached for sender sender-1. Email recipient@example.com was rescheduled to 2026-08-30T12:00:00.000Z.',
+  );
 });
 
 test('propagates transient Slack errors for bounded BullMQ retries', async () => {

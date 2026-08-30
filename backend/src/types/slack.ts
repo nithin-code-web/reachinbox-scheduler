@@ -13,6 +13,7 @@ export interface SlackChannelResponse {
 export type SlackNotificationEvent =
   | 'campaign_scheduled'
   | 'campaign_scheduling_failed'
+  | 'email_rate_limited'
   | 'email_sent'
   | 'email_failed';
 
@@ -21,8 +22,10 @@ export interface SlackNotificationJobData {
   event: SlackNotificationEvent;
   userId: string;
   campaignId: string;
+  senderId?: string;
   emailId?: string;
   recipient?: string;
+  nextHourAt?: string;
   scheduledCount?: number;
   errorMessage?: string;
 }

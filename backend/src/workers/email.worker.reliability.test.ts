@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import test, { type TestContext } from 'node:test';
 import { EmailStatus } from '@prisma/client';
+import type { SlackNotificationJobData } from '../types/slack.js';
 
 process.env.DATABASE_URL ??= 'postgresql://reachinbox:reachinbox_dev_password@localhost:5432/reachinbox';
 process.env.REDIS_URL ??= 'redis://localhost:6379';
@@ -383,6 +384,58 @@ test('keeps durable scheduled state when a rate-limit reschedule move fails', as
     const result = await emailStatus(second.emailId);
     assert.equal(result?.status, EmailStatus.SCHEDULED);
     assert.equal(result?.processingLeaseUntil, null);
+  } finally {
+    smtpTransporter.sendMail = originalSendMail;
+    await cleanupFixture(first);
+    await cleanupFixture(second);
+  }
+});
+
+test('enqueues one deterministic Slack notification when the hourly limit is reached', async (context) => {
+  const setup = await requireSetup(context);
+  if (!setup.available) return;
+  const worker = await workerPromise;
+  if (!worker) return;
+  const { smtpTransporter } = await import('../config/smtp.js');
+  const first = await createFixture(undefined, { hourlyLimit: 1 });
+  const second = await createFixture(undefined, {
+    senderId: first.senderId,
+    userId: first.userId,
+    hourlyLimit: 1,
+  });
+  const originalSendMail = smtpTransporter.sendMail;
+  const notifications: SlackNotificationJobData[] = [];
+  (smtpTransporter as unknown as { sendMail: () => Promise<unknown> }).sendMail = async () => ({});
+  const dependencies = {
+    enqueueSlackNotification: async (data: SlackNotificationJobData) => {
+      notifications.push(data);
+    },
+  };
+
+  try {
+    await worker.processSendEmailJob(fakeJob(first) as never, dependencies);
+    await assert.rejects(
+      worker.processSendEmailJob(fakeJob(second) as never, dependencies),
+      (error: unknown) => error instanceof Error && error.name === 'DelayedError',
+    );
+
+    const rateLimitNotifications = notifications.filter(
+      (notification) => notification.event === 'email_rate_limited',
+    );
+    assert.equal(rateLimitNotifications.length, 1);
+    const rateLimitNotification = rateLimitNotifications[0];
+    assert.ok(rateLimitNotification);
+    assert.deepEqual(rateLimitNotification, {
+      eventId: `email-rate-limited:${second.emailId}:${new Date(rateLimitNotification.nextHourAt!).getTime()}`,
+      event: 'email_rate_limited',
+      userId: second.userId,
+      campaignId: second.campaignId,
+      senderId: second.senderId,
+      emailId: second.emailId,
+      recipient: second.recipient,
+      nextHourAt: rateLimitNotification.nextHourAt,
+    });
+    assert.match(rateLimitNotification.nextHourAt ?? '', /^\d{4}-\d{2}-\d{2}T/);
   } finally {
     smtpTransporter.sendMail = originalSendMail;
     await cleanupFixture(first);

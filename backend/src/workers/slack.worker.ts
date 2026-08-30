@@ -14,6 +14,8 @@ function notificationText(data: SlackNotificationJobData): string {
       return `Campaign ${data.campaignId} scheduled${data.scheduledCount === undefined ? '' : ` with ${data.scheduledCount} emails`}.`;
     case 'campaign_scheduling_failed':
       return `Campaign ${data.campaignId} could not be fully scheduled.`;
+    case 'email_rate_limited':
+      return `Hourly email limit reached for sender${data.senderId ? ` ${data.senderId}` : ''}. Email ${data.recipient ?? 'recipient'} was rescheduled to ${data.nextHourAt ? new Date(data.nextHourAt).toISOString() : 'the next UTC hour'}.`;
     case 'email_sent':
       return `Email ${data.emailId ?? 'unknown'} sent to ${data.recipient ?? 'recipient'}.`;
     case 'email_failed':

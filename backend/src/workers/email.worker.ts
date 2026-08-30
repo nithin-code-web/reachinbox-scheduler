@@ -29,6 +29,7 @@ import {
 import { rescheduleEmailForNextHour } from '../services/email-reschedule.service.js';
 import { queueEmailIndexUpdate } from '../services/email-index.service.js';
 import { enqueueSlackNotification } from '../queues/slack.queue.js';
+import type { SlackNotificationJobData } from '../types/slack.js';
 
 const MAX_ERROR_MESSAGE_LENGTH = 500;
 const SEND_START_LOCK_TTL_MS = Math.min(env.PROCESSING_LEASE_MS, 30_000);
@@ -76,6 +77,39 @@ function isFinalAttempt(job: Job<SendEmailJobData>): boolean {
 function wait(milliseconds: number): Promise<void> {
   if (milliseconds <= 0) return Promise.resolve();
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+export interface EmailWorkerDependencies {
+  enqueueSlackNotification: (
+    data: SlackNotificationJobData,
+  ) => Promise<void>;
+}
+
+const productionDependencies: EmailWorkerDependencies = {
+  enqueueSlackNotification,
+};
+
+function notifyHourlyLimitReached(
+  email: {
+    id: string;
+    campaignId: string;
+    senderId: string;
+    recipient: string;
+    campaign: { userId: string };
+  },
+  nextHourAt: number,
+  dependencies: EmailWorkerDependencies,
+): void {
+  void dependencies.enqueueSlackNotification({
+    eventId: `email-rate-limited:${email.id}:${nextHourAt}`,
+    event: 'email_rate_limited',
+    userId: email.campaign.userId,
+    campaignId: email.campaignId,
+    senderId: email.senderId,
+    emailId: email.id,
+    recipient: email.recipient,
+    nextHourAt: new Date(nextHourAt).toISOString(),
+  });
 }
 
 class ProcessingLeaseGuard {
@@ -248,7 +282,10 @@ async function releaseHeldSendStartSlot(
 
 // Exported for deterministic reliability tests; the production Worker below
 // still uses this exact processor and no runtime behavior is changed.
-export async function processSendEmailJob(job: Job<SendEmailJobData>): Promise<void> {
+export async function processSendEmailJob(
+  job: Job<SendEmailJobData>,
+  dependencies: EmailWorkerDependencies = productionDependencies,
+): Promise<void> {
   const { emailId } = job.data;
   const jobId = job.id ?? emailJobId(emailId);
 
@@ -307,6 +344,7 @@ export async function processSendEmailJob(job: Job<SendEmailJobData>): Promise<v
     );
 
     if (!hourlyReservation.allowed) {
+      notifyHourlyLimitReached(email, hourlyReservation.nextHourAt, dependencies);
       logger.info(
         { emailId, jobId, scheduledAt: new Date(hourlyReservation.nextHourAt) },
         'Email rescheduled for the next UTC hour after rate limit was exceeded',
@@ -332,6 +370,7 @@ export async function processSendEmailJob(job: Job<SendEmailJobData>): Promise<v
     );
 
     if (!hourlyReservation.allowed) {
+      notifyHourlyLimitReached(email, hourlyReservation.nextHourAt, dependencies);
       await releaseHeldSendStartSlot(email.senderId, sendStartSlot, true);
       sendStartSlot = undefined;
       logger.info(
@@ -357,6 +396,7 @@ export async function processSendEmailJob(job: Job<SendEmailJobData>): Promise<v
     );
 
     if (!hourlyReservation.allowed) {
+      notifyHourlyLimitReached(email, hourlyReservation.nextHourAt, dependencies);
       await releaseHeldSendStartSlot(email.senderId, sendStartSlot, true);
       sendStartSlot = undefined;
       logger.info(
@@ -404,7 +444,7 @@ export async function processSendEmailJob(job: Job<SendEmailJobData>): Promise<v
     await lease.stopHeartbeat();
     await transitionToSent(emailId, lease.leaseUntil);
     queueEmailIndexUpdate(emailId);
-    void enqueueSlackNotification({
+    void dependencies.enqueueSlackNotification({
       eventId: `email-sent:${emailId}`,
       event: 'email_sent',
       userId: email.campaign.userId,
@@ -474,7 +514,7 @@ export async function processSendEmailJob(job: Job<SendEmailJobData>): Promise<v
     );
     queueEmailIndexUpdate(emailId);
     if (!retryable) {
-      void enqueueSlackNotification({
+      void dependencies.enqueueSlackNotification({
         eventId: `email-failed:${emailId}`,
         event: 'email_failed',
         userId: email.campaign.userId,
@@ -572,10 +612,14 @@ export async function recoverScheduledEmailJobs(): Promise<void> {
   }
 }
 
-export const emailWorker = new Worker<SendEmailJobData>(EMAIL_QUEUE_NAME, processSendEmailJob, {
+export const emailWorker = new Worker<SendEmailJobData>(
+  EMAIL_QUEUE_NAME,
+  (job) => processSendEmailJob(job),
+  {
   connection: redisConnection,
   concurrency: env.WORKER_CONCURRENCY,
-});
+  },
+);
 
 emailWorker.on('error', (error) => {
   logger.error({ err: error }, 'Email worker error');
