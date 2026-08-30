@@ -18,8 +18,8 @@ export function EmailList({ emails, mailbox, selectedId, onSelect }: { emails: E
           <div className="avatar">{email.recipient.slice(0, 1).toUpperCase()}</div>
           <div className="email-row-main">
             <div className="email-row-top"><strong>{email.recipient}</strong><span>{formatTime(email.sentAt ?? email.scheduledAt, mailbox)}</span></div>
-            <div className="email-row-subject">{email.subject}</div>
-            <p>{email.preview}</p>
+            <div className="email-row-subject">{email.subject ?? 'Subject unavailable'}</div>
+            <p>{email.preview ?? 'Message preview is not available from this endpoint.'}</p>
           </div>
           <div className="email-row-actions"><StatusBadge status={email.status} /><Icon name="star" size={18} /></div>
         </button>

@@ -12,14 +12,14 @@ export interface User {
 export interface EmailRecord {
   id: string;
   recipient: string;
-  subject: string;
-  body: string;
+  subject?: string;
+  body?: string;
   scheduledAt: string;
   sentAt?: string | null;
   status: EmailStatus;
-  senderName: string;
-  senderEmail: string;
-  preview: string;
+  senderName?: string;
+  senderEmail?: string;
+  preview?: string;
 }
 
 export interface Sender {
@@ -36,4 +36,16 @@ export interface CampaignDraft {
   startTime: string;
   delaySeconds: number;
   hourlyLimit: number;
+}
+
+export interface EmailPagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface EmailSearchResponse {
+  items: EmailRecord[];
+  pagination: EmailPagination;
 }
