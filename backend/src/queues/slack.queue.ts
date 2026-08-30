@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { Job, Queue } from 'bullmq';
 import { env } from '../config/env.js';
 import { logger } from '../config/logger.js';
@@ -19,7 +20,7 @@ export const slackNotificationQueue = new Queue<SlackNotificationJobData>(
 );
 
 export function slackNotificationJobId(eventId: string): string {
-  return `slack-${eventId}`;
+  return `slack-${crypto.createHash('sha256').update(eventId).digest('hex')}`;
 }
 
 export async function addSlackNotificationJob(

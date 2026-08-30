@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
 
 process.env.DATABASE_URL ??= 'postgresql://test:test@localhost:5432/test';
 process.env.REDIS_URL ??= 'redis://localhost:6379';
@@ -29,9 +29,48 @@ test('uses deterministic notification job IDs and does not include tokens', asyn
   };
 
   await addSlackNotificationJob(data, queue as never);
-  assert.equal(slackNotificationJobId(data.eventId), 'slack-email-sent:email-1');
-  assert.equal(added?.options.jobId, 'slack-email-sent:email-1');
+  const jobId = slackNotificationJobId(data.eventId);
+  assert.match(jobId, /^slack-[a-f0-9]{64}$/);
+  assert.doesNotMatch(jobId, /:/);
+  assert.equal(added?.options.jobId, jobId);
   assert.equal('accessToken' in (added?.data ?? {}), false);
+});
+
+test('accepts colon event IDs on BullMQ and preserves idempotency', async (context: TestContext) => {
+  const { redisConnection } = await import('../db/redis.js');
+  const { SLACK_NOTIFICATION_JOB_NAME, slackNotificationJobId, slackNotificationQueue } =
+    await queuePromise;
+
+  try {
+    await redisConnection.ping();
+  } catch {
+    context.skip('Redis is required for BullMQ queue verification');
+    return;
+  }
+
+  const eventId = 'campaign_scheduled:campaign-queue-test';
+  const jobId = slackNotificationJobId(eventId);
+  await slackNotificationQueue.getJob(jobId).then((job) => job?.remove());
+
+  const first = await slackNotificationQueue.add(
+    SLACK_NOTIFICATION_JOB_NAME,
+    { ...data, eventId },
+    { jobId, delay: 60_000 },
+  );
+  const second = await slackNotificationQueue.add(
+    SLACK_NOTIFICATION_JOB_NAME,
+    { ...data, eventId },
+    { jobId, delay: 60_000 },
+  );
+
+  try {
+    assert.equal(first.id, jobId);
+    assert.equal(second.id, jobId);
+    assert.doesNotMatch(first.id ?? '', /:/);
+    assert.equal((await slackNotificationQueue.getJob(jobId))?.data.eventId, eventId);
+  } finally {
+    await first.remove();
+  }
 });
 
 test('swallows queue failures so Slack cannot fail the email path', async () => {
@@ -46,6 +85,8 @@ test('swallows queue failures so Slack cannot fail the email path', async () => 
 });
 
 test.after(async () => {
+  const { closeSlackNotificationQueue } = await queuePromise;
   const { redisConnection } = await import('../db/redis.js');
+  await closeSlackNotificationQueue();
   redisConnection.disconnect();
 });
