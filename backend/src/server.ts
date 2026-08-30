@@ -7,6 +7,7 @@ import { closeElasticsearch } from './db/elasticsearch.js';
 import { closePostgres } from './db/postgres.js';
 import { closePrisma } from './db/prisma.js';
 import { closeRedis } from './db/redis.js';
+import { requireAuth } from './middleware/auth.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { notFoundHandler } from './middleware/not-found.js';
 import { closeEmailQueue } from './queues/email.queue.js';
@@ -15,12 +16,14 @@ import { apiRouter } from './routes/index.js';
 import { closeEmailIndexing, startEmailIndexing } from './services/email-index.service.js';
 import { closeEmailWorker } from './workers/email.worker.js';
 import { closeSlackNotificationWorker } from './workers/slack.worker.js';
+import { QUEUE_DASHBOARD_PATH, queueDashboardRouter } from './admin/queue-dashboard.js';
 
 export const app = express();
 
 app.use(helmet());
 app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
 app.use(express.json());
+app.use(QUEUE_DASHBOARD_PATH, requireAuth, queueDashboardRouter);
 app.use(apiRouter);
 app.use(notFoundHandler);
 app.use(errorHandler);

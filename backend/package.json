@@ -13,9 +13,11 @@
     "prisma:validate": "prisma validate",
     "prisma:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "test": "tsx --test src/services/rate-limit.service.test.ts src/services/processing-lease.service.test.ts src/services/email-reschedule.service.test.ts src/services/email-index.service.test.ts src/services/auth.service.test.ts src/services/session.service.test.ts src/middleware/auth.test.ts src/services/ownership.service.test.ts src/services/slack.service.test.ts src/queues/slack.queue.test.ts src/workers/slack.worker.test.ts"
+    "test": "tsx --test src/admin/queue-dashboard.test.ts src/services/rate-limit.service.test.ts src/services/processing-lease.service.test.ts src/services/email-reschedule.service.test.ts src/services/email-index.service.test.ts src/services/auth.service.test.ts src/services/session.service.test.ts src/middleware/auth.test.ts src/services/ownership.service.test.ts src/services/slack.service.test.ts src/queues/slack.queue.test.ts src/workers/slack.worker.test.ts"
   },
   "dependencies": {
+    "@bull-board/api": "^9.5.0",
+    "@bull-board/express": "^9.5.0",
     "@elastic/elasticsearch": "~8.15.3",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
