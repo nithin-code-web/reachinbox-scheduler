@@ -394,7 +394,6 @@ The final Task 15 verification also ran `git diff --check`, `docker compose conf
 - SMTP delivery has an unavoidable crash window between provider acceptance and the PostgreSQL `SENT` update.
 - There is no sender-list API yet; local compose uses `VITE_DEFAULT_SENDER_ID`, which must be an owned sender UUID.
 - Elasticsearch is eventually consistent and search is unavailable with a `503` while the index service is unavailable.
-- Some existing Slack notification event IDs contain `:`. BullMQ rejects those custom job IDs, so those notifications may be logged as not queued; this does not fail the email pipeline and remains a follow-up issue.
 - Current npm audit reports four high-severity findings. Do not run `npm audit fix --force`; its suggested dependency changes are breaking upgrades.
 
 ## Assignment and demo notes
