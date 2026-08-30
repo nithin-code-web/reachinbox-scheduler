@@ -246,7 +246,9 @@ async function releaseHeldSendStartSlot(
   }
 }
 
-async function processSendEmailJob(job: Job<SendEmailJobData>): Promise<void> {
+// Exported for deterministic reliability tests; the production Worker below
+// still uses this exact processor and no runtime behavior is changed.
+export async function processSendEmailJob(job: Job<SendEmailJobData>): Promise<void> {
   const { emailId } = job.data;
   const jobId = job.id ?? emailJobId(emailId);
 
@@ -386,6 +388,12 @@ async function processSendEmailJob(job: Job<SendEmailJobData>): Promise<void> {
       text: email.body,
     });
 
+    // Attach a rejection handler before doing the asynchronous Redis cleanup.
+    // The original promise is still awaited below so the existing failure
+    // classification and BullMQ retry behavior are preserved, while a fast
+    // SMTP rejection cannot become an unhandled rejection during cleanup.
+    void smtpPromise.catch(() => undefined);
+
     // Release the short gate after the SMTP operation has begun. A lock TTL
     // still protects the process-crash window before this release executes.
     await releaseHeldSendStartSlot(email.senderId, sendStartSlot, false);
@@ -506,7 +514,7 @@ async function recoveryAttemptAllowed(emailId: string): Promise<boolean> {
   return attempts <= 1;
 }
 
-async function recoverScheduledEmailJobs(): Promise<void> {
+export async function recoverScheduledEmailJobs(): Promise<void> {
   const emails = await prisma.email.findMany({
     where: { status: EmailStatus.SCHEDULED },
     orderBy: { scheduledAt: 'asc' },
